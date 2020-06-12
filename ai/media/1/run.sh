@@ -1,0 +1,1 @@
+timeout -m 1073741824 -t 150 python3 '/home/zac/drive_1/python/AI_Battle/Data-Base/ai/media/1/client/Controller.py'
