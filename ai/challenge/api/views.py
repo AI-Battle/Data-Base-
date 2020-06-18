@@ -173,13 +173,17 @@ class TeamViewList(viewsets.ReadOnlyModelViewSet):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def submit_file(request):    
     if request.method == 'POST':
         serializer = SubmissionSerializer(data=request.data)
         if serializer.is_valid():
-            data = serializer.submit()
+            data = serializer.submit(request.user)
             return Response(data)
     return Response({'response':'wrong'})
 
 
 
+
+
+# to do : submission is wrong in tasks ...

@@ -22,11 +22,12 @@ class TeamRegistation(serializers.ModelSerializer):
             )
             user.teams.add(team)
             for i in range(min(len(field),2)):
-                team.member.add(field[i][0])
-                text = ' {admin} invited you to join {team} '.format(admin=team.admin, team=team.name)
-                link = 'http://127.0.0.1:8000/answer/{team}'.format(team=team.name)
-                message = PostMessage.objects.create(message=text, data=link)
-                field[i][0].message_box.add(message)
+                if field[i][0] != user:
+                    team.member.add(field[i][0])
+                    text = 'Hi {user}, {admin} invited you to join {team} '.format(user=field[i][0].username, admin=team.admin, team=team.name)
+                    link = 'http://127.0.0.1:8000/answer/{team}'.format(team=team.name)
+                    message = PostMessage.objects.create(message=text, data=link)
+                    field[i][0].message_box.add(message)
             return team
         
 
@@ -188,18 +189,18 @@ class SubmissionSerializer(serializers.ModelSerializer):
     #         'challenge_name':self.validated_data['challenge_name']
     #     }
     #     return data
-    def submit(self, member="ali"):
+    def submit(self, member):
 
         challenge = Challenge.objects.filter(name = self.validated_data['challenge_name'])[0]
         T = Team.objects.filter(name = self.validated_data['team'])[0]
         user = User.objects.filter(username = member)[0]  #user member
         file = self.validated_data['zip_file']
         language = self.validated_data['language_name']
-        if file.name[-4:] == '.zip' and user in T.member.distinct() or user == T.admin : #and the team is in this challenge
+        if file.name[-4:] == '.zip' and ( member in T.member.distinct() or member == T.admin ) : # and T in challenge.team.distinct() # for this chanllenge , team shoud register in challenge
             if len(Submission.objects.all()) == 0 :
                 file.name = str(1)
             else:
-                str(Submission.objects.latest('id').id+1)
+                file.name = str(Submission.objects.latest('id').id+1)
             submit = Submission.objects.create(
                 challenge = challenge,
                 user = user,
@@ -213,10 +214,10 @@ class SubmissionSerializer(serializers.ModelSerializer):
             from challenge.tasks import submission_task
             ans = submission_task.delay(data)
             if ans.result==0:
-                rs = {'response' : 'there is problem in submit .  please try again '}
+                rs = 'there is problem in submit .  please try again '
             else: 
-                rs = {"response":"succes submit "}
-            return rs
+                rs = "succes submit "
+            return {'response' : rs}
         else:
             return {"response":"fail"}
         
