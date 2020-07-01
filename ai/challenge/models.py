@@ -1,5 +1,6 @@
 from django.db import models
 from datetime import datetime
+from django.db.models.signals import post_save
 
 class Reward(models.Model):
     name = models.CharField(max_length=50)
@@ -29,6 +30,8 @@ class Submission(models.Model):
 
     date = models.DateTimeField(auto_now=True)
 
+    game = models.ForeignKey('challenge.Game', on_delete=models.CASCADE)
+
     def __str__(self):
         return " ({}) : {} : {} : {} ".format(self.id , self.user, self.language, str(self.date)[:19])
 
@@ -40,11 +43,10 @@ class Team(models.Model):
     member = models.ManyToManyField("account.User", blank=True)
     score = models.ManyToManyField('challenge.Score', blank=True, related_name='members')
     submission = models.ManyToManyField("challenge.Submission",blank=True)
-    message_box = models.ManyToManyField('challenge.PostMessage')
+    message_box = models.ManyToManyField('challenge.PostMessage',blank=True)
     active = models.BooleanField(default=False)
     # challenge_history = models.ManyToManyField("challenge.Challenge")
     #game = models.ManyToManyField("challenges.Game")
-
 
     def __str__(self):
         return self.name
@@ -52,33 +54,48 @@ class Team(models.Model):
 
 class Challenge(models.Model):
     name = models.CharField(max_length=50)
-    # discribtion = models.TextField()
-    # teams = models.ManyToManyField("challenge.Team")
-    # team_1_score = models.IntegerField(default=0)
-    # team_2_score = models.IntegerField(default=0)
-    # game = models.ManyToManyField("challenge.Game")
+    discribtion = models.TextField(default=" ")
+    teams = models.ManyToManyField("challenge.Team",blank=True) # همه ی تیم ها
+    game = models.ManyToManyField("challenge.Game",blank=True)  # گیم ها ONE TO MANY
+    Race = models.ManyToManyField("challenge.Race",blank=True)  # مسابقات
     # # laby - waiting - finished ---> must be creat dear developers
     # STATUS_CHOICE = {('laby','Laby'), ('waiting','Waiting'), ('finished','Finished')}
     # challenge_status = models.CharField(choices=STATUS_CHOICE, default='laby', max_length=50)
     
-
     def __str__(self):
         return self.name
 
 
 class Game(models.Model):
-    name = models.CharField(max_length=50)
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Race(models.Model):
+    name = models.CharField(max_length=50, blank=True)
+    game = models.ForeignKey("challenge.Game", on_delete=models.CASCADE)  # گیم مسابقه
     team_1 = models.ForeignKey('challenge.Team', related_name='team_1', on_delete=models.CASCADE)
     team_2 = models.ForeignKey('challenge.Team', related_name='team_2', on_delete=models.CASCADE)
     team1_result = models.IntegerField(default=0)
     team2_result = models.IntegerField(default=0)
-    # game_score = models.IntegerField(default=0)
-     
-    TYPE_CHOICE = {('tornoment','T'), ('f_normal','N'), ('f_random','R'), ('Lig','L')}
-    game_type = models.CharField(choices=TYPE_CHOICE, default='friendly', max_length=50)
-    challenge = models.ForeignKey(Challenge, on_delete=models.CASCADE)
-    # game_map = models.CharField(blank=True,null=True,max_length=70)
+    allow = models.BooleanField(default=False)
+    # game_score = models.IntegerField(default=0) #  این مقدار به اسکور تیم ها کم یا اضاقه می شود
     
+    # TYPE_CHOICE = {('tornoment','T'), ('f_normal','N'), ('f_random','R'), ('Lig','L')}
+    # game_type = models.CharField(choices=TYPE_CHOICE, default='friendly', max_length=50)
+    # game_map = models.CharField(blank=True,null=True,max_length=70)
+
+
+    def __str__(self):
+        return '{} : {} '.format(self.name, self.id)
+    
+
+def set_name(sender, instance, **kwargs):
+    new_name = " {} VS {} ".format(instance.team_1.name, instance.team_2.name)
+    Race.objects.filter(id = instance.id ).update(name = new_name ) 
+post_save.connect(set_name, sender=Race)
 
 
 class Score(models.Model):
@@ -97,7 +114,7 @@ class Score(models.Model):
 
 class PostMessage(models.Model):
     message = models.CharField(max_length=100)
-    data = models.CharField(max_length=100)
+    data = models.CharField(max_length=100,blank=True)
 
     def __str__(self):
         return 'message in id : {}'.format(self.id)

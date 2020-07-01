@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from challenge.models import Team, Score, Challenge, PostMessage, Submission
+from challenge.models import Team, Score, Challenge, PostMessage, Submission, Race,Game
 from account.models import User
 from django.forms.fields import FileField
 
@@ -172,53 +172,153 @@ class ChallengeSerializer(serializers.HyperlinkedModelSerializer):
 ##########################################################
 
 
-class SubmissionSerializer(serializers.ModelSerializer):
-    
-    challenge_name = serializers.CharField()
+class SubmissionSerializer(serializers.ModelSerializer):    
     team = serializers.CharField()
-    language_name = serializers.CharField()
+    challenge = serializers.CharField()
+    game = serializers.CharField()
+
 
     class Meta:
         model = Submission
-        fields = ('challenge_name', 'team', 'zip_file', 'language_name')
+        fields = ('challenge', 'team', 'language', 'game', 'zip_file')
 
-    # def custom_data(self):
-    #     data = {
-    #         'team':self.validated_data['team'],
-    #         'zip_file':self.validated_data['zip_file'],
-    #         'challenge_name':self.validated_data['challenge_name']
-    #     }
-    #     return data
+    
     def submit(self, member):
-
-        challenge = Challenge.objects.filter(name = self.validated_data['challenge_name'])[0]
-        T = Team.objects.filter(name = self.validated_data['team'])[0]
-        user = User.objects.filter(username = member)[0]  #user member
-        file = self.validated_data['zip_file']
-        language = self.validated_data['language_name']
-        if file.name[-4:] == '.zip' and ( member in T.member.distinct() or member == T.admin ) : # and T in challenge.team.distinct() # for this chanllenge , team shoud register in challenge
+        try:
+            challenge = Challenge.objects.filter(name = self.validated_data['challenge'])[0]
+            team = Team.objects.filter(name= self.validated_data['team'])[0]
+            file = self.validated_data['zip_file']
+            language = self.validated_data['language']
+            game = Game.objects.filter(name = self.validated_data['game'])[0]
+        except:
+            result = {'response':'wrong. pleas try again'}
+            return result
+        if file.name[-4:] != '.zip':
+            result = {'response':'your file is not zip'}
+        else:
             if len(Submission.objects.all()) == 0 :
                 file.name = str(1)
             else:
                 file.name = str(Submission.objects.latest('id').id+1)
             submit = Submission.objects.create(
                 challenge = challenge,
-                user = user,
+                user = member,
                 zip_file = file,
                 language = language,
-                status = 'compiling'
+                status = 'compiling',
+                game = game 
             )
             data = {
                 "file":submit.id,
                 }
-            from challenge.tasks import submission_task
-            ans = submission_task.delay(data)
+            from challenge.tasks import compile_task
+            ans = compile_task.delay(data)
             if ans.result==0:
                 rs = 'there is problem in submit .  please try again '
             else: 
+                team.submission.add(submit)
                 rs = "succes submit "
-            return {'response' : rs}
-        else:
-            return {"response":"fail"}
+        return {'response' : rs}
+        
+
+
+
+class ChallengeRegisterSerializer(serializers.Serializer):
+    team = serializers.CharField()
+    challenge = serializers.CharField()
+
+    def register_team(self, user):
+        result = ""
+        try:
+            challenge = Challenge.objects.filter(name = self.validated_data['challenge'])[0]
+            T = Team.objects.filter(name = self.validated_data['team'])[0]
+            if user == T.admin and T.active == True:
+                challenge.teams.add(T)
+                result = 'team {} added'.format(T.name)
+            else:
+                result = 'you can not do this'
+        except:
+            result = 'except'
+        return result
+
+
+
+class CreatRace(serializers.Serializer):
+    rival_team = serializers.CharField() 
+    your_team = serializers.CharField()
+    challenge = serializers.CharField()
+    game = serializers.CharField()
+
+
+    def creat(self, user):
+        result = ''
+        try:
+            challenge = Challenge.objects.filter(name = self.validated_data['challenge'])[0]
+            teams = challenge.teams.distinct() 
+            rival_team = Team.objects.filter(name = self.validated_data['rival_team'])[0]
+            team = Team.objects.filter(name = self.validated_data['your_team'])[0]
+            games = challenge.game.distinct()
+            game = Game.objects.filter(name = self.validated_data['game'])[0]
+            if user != team.admin:
+                result = {'response':"you are not admin of {}".format(Team.name)}
+            elif game not in games:
+                result = {'response':'this game is not in this challneg'}
+            elif (rival_team not in teams) or (team not in teams):
+                result = "shout every two team be in challenge"
+            else:
+                race = Race.objects.create(
+                    game = game,
+                    team_1 = team,
+                    team_2 = rival_team
+                )
+
+                text = ' {admin} from {team} invited you to a race in {G} game '.format(admin=user.username,team=team.name, G=game.name)
+                message = PostMessage.objects.create(message=text)
+                link = 'http://127.0.0.1:9000/answer-to-race/{team}/{race}/{msg}'.format(team=rival_team.name, race=race.id, msg=message.id )
+                message.data = link
+                message.save()
+                rival_team.message_box.add(message)
+                result = "invite send"
+        except :
+            result = {'response':'wrong in exept'}
+        return result
+
+
+class AnswerToRaceRegister(serializers.Serializer):
+    race_id = serializers.CharField()  
+    msg_id = serializers.CharField()
+    answer = serializers.CharField()
+
+
+    def set_invite(self, team, user):       
+        try: 
+            T = Team.objects.filter(name = team)[0]
+            ans = self.validated_data['answer']
+            msg = PostMessage.objects.filter(id=self.validated_data['msg_id'])[0]
+            race = Race.objects.filter(id = self.validated_data['race_id'])[0]
+            # import pdb; pdb.set_trace()
+            if user == T.admin:
+                if ans == 'Yes':
+                        race.allow = True
+                        race.save()
+                        text = '{team} accepted your invite'.format(team=team)
+                        message = PostMessage.objects.create(message=text)
+                        race.team_1.message_box.add(message)
+                        msg.delete()
+                        result = {'response':'invite accepted'}
+                elif ans == "No":
+                    text = '{team} passed your invite'.format(team)
+                    message = PostMessage.objects.create(message=text)
+                    race.team_1.message_box.add(message)
+                    msg.delete()
+                    race.delete()
+                    result = {'response':'invite passes'}
+            else:
+                result = {'response':'you are not admin of this group'}
+            return result
+        except:
+            result = {'response':"wrong  in except"} 
+            return result
+
         
 

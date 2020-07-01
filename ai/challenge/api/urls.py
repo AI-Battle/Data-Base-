@@ -26,6 +26,10 @@ urlpatterns = [
     path('addmember', views.add_member ),
     path('removemember', views.delete_member ),
     
+    path('challenge-register', views.challenge_register ),
+    path('create-race', views.create_race),
+    path('answer-to-race/<str:team>', views.answertorace),
+
     path('submit', views.submit_file ),
 
 

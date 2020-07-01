@@ -3,7 +3,7 @@ from challenge import compiler
 from challenge.models import Submission
 
 @shared_task
-def submission_task(data):
+def compile_task(data):
     submit = Submission.objects.filter(id = data['file'])[0]
     if submit.language == 'python': ans = compiler.python(submit.id)
     elif submit.language == 'c++': ans = compiler.cpp(submit.id)

@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from .permission import SubmitOneCode, Registred
 from account.models import User
 from challenge.models import (
     Team,
@@ -20,11 +20,13 @@ from .serializer import (
     Member_Edit,
     DeleteTeam,
     PostSerializer,
-    SubmissionSerializer
+    SubmissionSerializer,
+    ChallengeRegisterSerializer,
+    CreatRace,
+    AnswerToRaceRegister,
     )
 
 
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 
@@ -164,16 +166,8 @@ class TeamViewList(viewsets.ReadOnlyModelViewSet):
 
 
 
-
-
-
-
-#################################################
-################## submission ###################
-
-
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,Registred])
 def submit_file(request):    
     if request.method == 'POST':
         serializer = SubmissionSerializer(data=request.data)
@@ -184,6 +178,40 @@ def submit_file(request):
 
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def challenge_register(request):
+    if request.method == "POST":
+        serializer = ChallengeRegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            ans = serializer.register_team(request.user)
+            return Response(ans)
+    return Response({'response':'wrong'}) 
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated,SubmitOneCode])
+def create_race(request):
+    if request.method == 'POST':
+        serializer = CreatRace(data=request.data)
+        if serializer.is_valid():
+            result = serializer.creat(request.user)
+            return Response(result)
+    return Response({'response':'wrong'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def answertorace(request, team):
+    if request.method == 'POST':
+        serializer = AnswerToRaceRegister(data=request.data)
+        if serializer.is_valid():
+            result = serializer.set_invite(team, request.user)
+            return Response(result) 
+    return Response({"response":"wrong"})
+    
 
 
 # to do : submission is wrong in tasks ...
+
+# to do : team-28 is one member on it is active
