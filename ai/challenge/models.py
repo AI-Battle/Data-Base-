@@ -29,7 +29,7 @@ class Submission(models.Model):
 
     date = models.DateTimeField(auto_now=True)
 
-    game = models.ForeignKey('challenge.Game', on_delete=models.CASCADE, related_name='Game')
+    game = models.ForeignKey('challenge.Game', on_delete=models.CASCADE,default='')
 
     def __str__(self):
         return " ({}) : {} : {} : {} ".format(self.id , self.user, self.language, str(self.date)[:19])
@@ -66,7 +66,7 @@ class Challenge(models.Model):
 
 
 class Game(models.Model):
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50, unique=True, default='game')
 
     def __str__(self):
         return self.name
