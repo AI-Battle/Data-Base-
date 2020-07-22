@@ -1,5 +1,4 @@
 from django.db import models
-from datetime import datetime
 from django.db.models.signals import post_save
 
 class Reward(models.Model):
@@ -7,7 +6,7 @@ class Reward(models.Model):
     rank = models.IntegerField(choices={(1,1),(2,2),(3,3)}) 
     discribtion = models.TextField()
     users = models.ManyToManyField("account.User", blank=True)
-    date = models.DateTimeField(default=datetime.now,)
+    date = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
@@ -30,7 +29,7 @@ class Submission(models.Model):
 
     date = models.DateTimeField(auto_now=True)
 
-    game = models.ForeignKey('challenge.Game', on_delete=models.CASCADE)
+    game = models.ForeignKey('challenge.Game', on_delete=models.CASCADE, related_name='Game')
 
     def __str__(self):
         return " ({}) : {} : {} : {} ".format(self.id , self.user, self.language, str(self.date)[:19])
