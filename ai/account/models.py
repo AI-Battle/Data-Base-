@@ -7,7 +7,7 @@ class User(AbstractUser):
     english_firstname = models.CharField(max_length=50)
     english_lastname = models.CharField(max_length=50)
     photo_main = models.ImageField(upload_to='photo/profile/%Y/%m/%d', blank=True)
-    birthday = models.DateTimeField(auto_now=False)
+    birthday = models.DateField(auto_now=False)
     individual_score = models.IntegerField(default=0, blank=True)
     phone_number = models.IntegerField(default=0, blank=True)
     national_id = models.IntegerField(default=0, blank=True) 
